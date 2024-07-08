@@ -17,6 +17,9 @@ import configparser
 import shutil
 import os.path
 
+apiKey = os.environ["APIKEY"]
+userId = os.environ["USERID"]
+
 ##global variable loops
 loop_str = None
 mp_use1 = "CT"
@@ -24,7 +27,7 @@ mp_use1 = "CT"
 ## activate .ini
 configp = configparser.ConfigParser()
 ##Param.ini
-paramname = "param/param_"+str( sys.argv[2] )+".ini"
+paramname = "param/param_" + userId + ".ini"
 ##Create user param file
 if os.path.isfile(paramname):
     print(paramname, " already exist")
@@ -38,8 +41,8 @@ def editparam():
         configp.write(configfile)
 
 ##TElegram param
-configp["telegram"]["api_key"] = str( sys.argv[1] )
-configp["telegram"]["user_id"] = str( sys.argv[2] )
+configp["telegram"]["api_key"] = apiKey
+configp["telegram"]["user_id"] = userId
 editparam()
 configp.read(paramname)
 bot = telebot.TeleBot(configp["telegram"]["api_key"])
@@ -215,44 +218,40 @@ def echo_all(message):
 
 #Get position and map
 def telegramposition():
-    if len(sys.argv) >= 2:
-        configp.read(paramname)
-        bot.send_message(configp["telegram"]["user_id"],"Last Rover position: \n"+
-            configp["coordinates"]["lat"]+","+
-            configp["coordinates"]["lon"]+"\n"+
-            configp["coordinates"]["date"]+" "+configp["coordinates"]["time"]+"\n"+
-            "Fix quality: "+configp["coordinates"]["type"]+"\n"+
-            "HDOP:        "+configp["coordinates"]["hdop"]+"\n"+
-            "Altitude:    "+configp["coordinates"]["elv"]+"\n"+
-            "ID station:  "+configp["coordinates"]["idsta"]+"\n"+
-            "Connected to "+configp["data"]["mp_use"])
+    configp.read(paramname)
+    bot.send_message(configp["telegram"]["user_id"],"Last Rover position: \n"+
+        configp["coordinates"]["lat"]+","+
+        configp["coordinates"]["lon"]+"\n"+
+        configp["coordinates"]["date"]+" "+configp["coordinates"]["time"]+"\n"+
+        "Fix quality: "+configp["coordinates"]["type"]+"\n"+
+        "HDOP:        "+configp["coordinates"]["hdop"]+"\n"+
+        "Altitude:    "+configp["coordinates"]["elv"]+"\n"+
+        "ID station:  "+configp["coordinates"]["idsta"]+"\n"+
+        "Connected to "+configp["data"]["mp_use"])
 
 def telegramlocation():
-    if len(sys.argv) >= 2:
-        configp.read(paramname)
-        bot.send_location(configp["telegram"]["user_id"],
-            longitude=configp["coordinates"]["lon"],
-            latitude=configp["coordinates"]["lat"],
-            live_period=None, reply_to_message_id=None,
-            reply_markup=None, disable_notification=None,
-            timeout=None, horizontal_accuracy=configp["coordinates"]["hdop"],
-            heading=None,
-            proximity_alert_radius=None, allow_sending_without_reply=None,
-            protect_content=None)
+    configp.read(paramname)
+    bot.send_location(configp["telegram"]["user_id"],
+        longitude=configp["coordinates"]["lon"],
+        latitude=configp["coordinates"]["lat"],
+        live_period=None, reply_to_message_id=None,
+        reply_markup=None, disable_notification=None,
+        timeout=None, horizontal_accuracy=configp["coordinates"]["hdop"],
+        heading=None,
+        proximity_alert_radius=None, allow_sending_without_reply=None,
+        protect_content=None)
 
 #Automatic message on base change with pytelegrambot (BUG ssl use python-telegram-bot not pyTelegramBotAPI )
 def telegrambot():
-    if len(sys.argv) >= 2:
-        configp.read(paramname)
-        bot1 = telegram.Bot(token=configp["telegram"]["api_key"])
-        bot1.send_message(configp["telegram"]["user_id"], configp["message"]["message"])
+    configp.read(paramname)
+    bot1 = telegram.Bot(token=configp["telegram"]["api_key"])
+    bot1.send_message(configp["telegram"]["user_id"], configp["message"]["message"])
 
 def telegrambot2():
-    if len(sys.argv) >= 2:
-        configp.read(paramname)
-        bot.send_message(configp["telegram"]["user_id"], "RtkBaseVar 0.2\nhttps://github.com/jancelin/RtkBaseVar/releases/tag/RtkBaseVar_0_2\n\n")
-        bot.send_message(configp["telegram"]["user_id"], configp["message"]["message2"]
-            +"\nYou are connected to "+configp["data"]["mp_use"])
+    configp.read(paramname)
+    bot.send_message(configp["telegram"]["user_id"], "RtkBaseVar 0.2\nhttps://github.com/jancelin/RtkBaseVar/releases/tag/RtkBaseVar_0_2\n\n")
+    bot.send_message(configp["telegram"]["user_id"], configp["message"]["message2"]
+        +"\nYou are connected to "+configp["data"]["mp_use"])
 
 ##Create user log file
 def createlog():
@@ -438,12 +437,12 @@ def stoptowrite():
     loop_str.start()
 
 def restartbasevar():
-        print("argv was",sys.argv)
-        print("sys.executable was", sys.executable)
-        print("restart now")
-        ## KILL old str2str_in
-        killstr()
-        os.execv('/usr/bin/python3', ['/usr/bin/python3'] + sys.argv)
+    print("argv was",sys.argv)
+    print("sys.executable was", sys.executable)
+    print("restart now")
+    ## KILL old str2str_in
+    killstr()
+    os.execv('/usr/bin/python3', ['/usr/bin/python3'] + sys.argv)
 
 def killstr():
     # iterating through each instance of the process

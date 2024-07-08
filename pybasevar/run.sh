@@ -6,4 +6,4 @@ socat -d -d pty,raw,echo=0 pty,raw,echo=0 &>/dev/null &
 sleep 3 &&
 echo "SYSTEM: Start pybasevar"
 echo "SYSTEM: Telegram connexion > apikey :"$APIKEY " / user id" $USERID
-python3 /home/pybasevar.py $APIKEY $USERID
+python3 /home/pybasevar.py
