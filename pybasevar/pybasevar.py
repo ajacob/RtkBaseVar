@@ -166,31 +166,6 @@ def processSetLogE(message):
     else:
         bot.reply_to(message, 'Ok, logs kept in state. Bye!')
 
-# #Manual coordinates change
-# @bot.message_handler(commands=['coor'])
-# def send_coorE(message):
-#     configp.read(paramname)
-#     msg = bot.reply_to(message,"Edit coordinates:\n old value:\nlat: "+configp["coordinates"]["lat"]+","+configp["coordinates"]["lon"]+"\n Enter New latitude : ")
-#     bot.register_next_step_handler(msg, processSetLatE)
-# def processSetLatE(message):
-#     answer = message.text
-#     if answer.isnumeric():
-#         print(answer)
-#         configp["coordinates"]["lat"] = answer
-#         msg = bot.reply_to(message,"Enter New latitude :")
-#         bot.register_next_step_handler(msg, processSetLonE)
-#     else:
-#         bot.reply_to(message, 'Oooops bad value!')
-# def processSetLonE(message):
-#     answer = message.text
-#     if answer.isnumeric():
-#         print(answer)
-#         configp["coordinates"]["lon"] = answer
-#         stoptowrite()
-#         bot.reply_to(message,"NEW coordinates: "+configp["coordinates"]["lat"]+","+configp["coordinates"]["lon"])
-#     else:
-#         bot.reply_to(message, 'Oooops bad value!')
-
 #show last coordinates / map
 @bot.message_handler(commands=['map'])
 def send_map(message):
@@ -454,12 +429,6 @@ def killstr():
         os.kill(int(pidkill), signal.SIGKILL)
     print("KILLING all 'STR2STR -in ntrip' Successfully terminated")
 
-# def socat():
-#     global socat_run
-#     socat_run = subprocess.Popen(config.socat.split())
-#     print("/dev/pts/1 & /2 created")
-#     time.sleep(3)
-
 def str2str_out():
     global str2str_out
     ##run ntripcaster
@@ -470,13 +439,6 @@ def str2str_in():
     configp.read(paramname)
     bashstr = config.stream1+configp["data"]["mp_use"]+config.stream2
     str2str_in = subprocess.Popen(bashstr.split())
-
-# def start_socat():
-#     global socat_str
-#     socat_str = multiprocessing.Process(name='str_out',target=socat)
-#     socat_str.deamon = True
-#     print("socat_str Started:", multiprocessing.current_process().name)
-#     socat_str.start()
 
 def start_out_str2str():
     global out_str
@@ -503,13 +465,11 @@ def main():
     createlog()
     telegrambot2()
     telegramlocation()
-    # start_socat()
     start_out_str2str()
     start_in_str2str()
     start_loop_basevar()
     bot.infinity_polling()
 
-    # socat_str.join()
     out_str.join()
     in_str.join()
     loop_str.join()
