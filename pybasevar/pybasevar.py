@@ -23,6 +23,8 @@ userId = os.environ["USERID"]
 ##global variable loops
 loop_str = None
 mp_use1 = "CT"
+running = True
+stopEvent = multiprocessing.Event()
 
 ## activate .ini
 configp = configparser.ConfigParser()
@@ -40,19 +42,17 @@ def editparam():
     with open(paramname,'w') as configfile:
         configp.write(configfile)
 
-##TElegram param
+##Telegram param
 configp["telegram"]["api_key"] = apiKey
 configp["telegram"]["user_id"] = userId
 editparam()
 configp.read(paramname)
 bot = telebot.TeleBot(configp["telegram"]["api_key"])
 
-##Telegram messages
-#restart loop
 @bot.message_handler(commands=['restart'])
 def send_restart(message):
     configp.read(paramname)
-    bot.reply_to(message, 'Restarting SERVICE......')
+    bot.reply_to(message, "Restarting ... (I'll be back in a few seconds!)")
     restartbasevar()
 
 #base filter
@@ -224,7 +224,7 @@ def telegrambot():
 
 def telegrambot2():
     configp.read(paramname)
-    bot.send_message(configp["telegram"]["user_id"], "RtkBaseVar 0.2\nhttps://github.com/jancelin/RtkBaseVar/releases/tag/RtkBaseVar_0_2\n\n")
+    #bot.send_message(configp["telegram"]["user_id"], "RtkBaseVar 0.2\nhttps://github.com/jancelin/RtkBaseVar/releases/tag/RtkBaseVar_0_2\n\n")
     bot.send_message(configp["telegram"]["user_id"], configp["message"]["message2"]
         +"\nYou are connected to "+configp["data"]["mp_use"])
 
@@ -328,12 +328,19 @@ def ntripbrowser():
     #     print(mp,di,"km; Carrier:", car)
 
 ## 03-START loop to check base alive + rover position and nearest base
-def loop_mp():
+def loop_mp(stopEvent):
+    global mp_use1
+    global mp_use1_km
+    global msg
+
     while True:
         try:
-            global mp_use1
-            global mp_use1_km
-            global msg
+            stopEvent.wait(0.1)
+
+            if stopEvent.is_set():
+                print("loop_mp > Stop event received, exiting")
+                break
+
             ##get variables
             configp.read(paramname)
             ##Get data from Caster
@@ -411,13 +418,18 @@ def stoptowrite():
     print("Loop_str Starting:", multiprocessing.current_process().name)
     loop_str.start()
 
+# Make it simple and just stop the app, count on docker to restart everything
+# This is better than trying to restart ourself as we may leak resources
 def restartbasevar():
-    print("argv was",sys.argv)
-    print("sys.executable was", sys.executable)
-    print("restart now")
+    global running
+    global stopEvent
     ## KILL old str2str_in
     killstr()
-    os.execv('/usr/bin/python3', ['/usr/bin/python3'] + sys.argv)
+    print("Restart > Stop running")
+    running = False
+    stopEvent.set()
+    print("Bot > Stop polling (from restartbasevar)")
+    bot.stop_polling()
 
 def killstr():
     # iterating through each instance of the process
@@ -456,23 +468,40 @@ def start_in_str2str():
 
 def start_loop_basevar():
     global loop_str
-    loop_str = multiprocessing.Process(name='loop',target=loop_mp)
+    global stopEvent
+
+    loop_str = multiprocessing.Process(name='loop',target=loop_mp,args=(stopEvent,))
     loop_str.deamon = True
     print("Loop_str Starting:", multiprocessing.current_process().name)
     loop_str.start()
 
 def main():
+    global running
+
     createlog()
     telegrambot2()
     telegramlocation()
     start_out_str2str()
     start_in_str2str()
     start_loop_basevar()
-    bot.infinity_polling()
 
+    print("Bot> Start polling")
+
+    while running:
+        print("Bot> polling (start)")
+        bot.polling(long_polling_timeout=10)
+        print("Bot> polling (stop)")
+
+    print("Joining out_str ...")
     out_str.join()
+
+    print("Joining in_str ...")
     in_str.join()
+
+    print("Joining loop_str ...")
     loop_str.join()
+
+    print("Exiting")
 
 if __name__ == '__main__':
     main()
