@@ -16,6 +16,15 @@ import config
 import configparser
 import shutil
 import os.path
+import logging
+
+logging.basicConfig(
+    format='%(asctime)s %(levelname)-8s %(message)s',
+    level=logging.INFO,
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+logging.getLogger('ntripbrowser').setLevel(logging.WARN)
 
 apiKey = os.environ["APIKEY"]
 userId = os.environ["USERID"]
@@ -32,10 +41,10 @@ configp = configparser.ConfigParser()
 paramname = "param/param_" + userId + ".ini"
 ##Create user param file
 if os.path.isfile(paramname):
-    print(paramname, " already exist")
+    logging.info("%s already exist", paramname)
 else:
     shutil.copy('param.ini', paramname)
-    print("Creating ",paramname)
+    logging.info("Creating %s", paramname)
 configp.read(paramname)
 
 def editparam():
@@ -64,7 +73,7 @@ def send_exclE(message):
 def processSetExclE(message):
     answer = message.text
     if answer.isupper():
-        print(answer)
+        logging.info(answer)
         configp["data"]["exc_mp"] = answer
         stoptowrite()
         bot.reply_to(message,"NEW exclude Base(s): "+configp["data"]["exc_mp"])
@@ -80,7 +89,7 @@ def send_htrsE(message):
 def processSetHtrsE(message):
     answer = message.text
     if answer.isdigit():
-        print(answer)
+        logging.info(answer)
         configp["data"]["htrs"] = answer
         stoptowrite()
         bot.reply_to(message,"NEW Hysteresis: "+configp["data"]["htrs"]+"km")
@@ -96,7 +105,7 @@ def send_critE(message):
 def processSetCritE(message):
     answer = message.text
     if answer.isdigit():
-        print(answer)
+        logging.info(answer)
         configp["data"]["mp_km_crit"] = answer
         stoptowrite()
         bot.reply_to(message,"NEW Maximum distance before GNSS base change saved: "+configp["data"]["mp_km_crit"]+"km")
@@ -112,7 +121,7 @@ def send_distE(message):
 def processSetDistE(message):
     answer = message.text
     if answer.isdigit():
-        print(answer)
+        logging.info(answer)
         configp["data"]["maxdist"] = answer
         stoptowrite()
         bot.reply_to(message,"NEW Max search distance: "+configp["data"]["maxdist"]+"km")
@@ -128,7 +137,7 @@ def send_casterE(message):
 def processSetCasterE(message):
     answer = message.text
     if answer.islower():
-        print(answer)
+        logging.info(answer)
         configp["caster"]["adrs"] = answer
         msg = bot.reply_to(message,"NEW caster adresse: "+configp["caster"]["adrs"]+"\nEnter New port:")
         bot.register_next_step_handler(msg, processSetCasterPortE)
@@ -137,7 +146,7 @@ def processSetCasterE(message):
 def processSetCasterPortE(message):
     answer = message.text
     if answer.isdigit():
-        print(answer)
+        logging.info(answer)
         configp["caster"]["port"] = answer
         stoptowrite()
         bot.reply_to(message,"NEW caster adress + port: "+configp["caster"]["adrs"]+":"+configp["caster"]["port"])
@@ -160,7 +169,7 @@ def send_logE(message):
 def processSetLogE(message):
     answer = message.text
     if answer == "Yes":
-        print(answer)
+        logging.info(answer)
         clearlog()
         bot.reply_to(message,"The log file is now empty")
     else:
@@ -253,9 +262,9 @@ def movetobase():
     ## Build new str2str_in command
     bashstr = config.stream1 + mp_use1 + config.stream2
     ## LOG Move to base
-    print("------")
-    print("CASTER: Move to base ",mp_use1, " !")
-    print("------")
+    logging.info("------")
+    logging.info("CASTER: Move to base %s!", mp_use1)
+    logging.info("------")
     ## KILL old str2str_in
     killstr()
     ## Upd variables & Running a new str2str_in service
@@ -338,7 +347,7 @@ def loop_mp(stopEvent):
             stopEvent.wait(0.1)
 
             if stopEvent.is_set():
-                print("loop_mp > Stop event received, exiting")
+                logging.info("loop_mp > Stop event received, exiting")
                 break
 
             ##get variables
@@ -348,7 +357,7 @@ def loop_mp(stopEvent):
             ##My base is Alive?
             flt_basealive = [m for m in flt1 if m['Mountpoint']==configp["data"]["mp_alive"]]
             if len(flt_basealive) == 0:
-                print("INFO: Base ",configp["data"]["mp_alive"]," is DEAD!")
+                logging.info("INFO: Base %s is DEAD!", configp["data"]["mp_alive"])
                 movetobase()
                 savelog()
             else:
@@ -370,9 +379,14 @@ def loop_mp(stopEvent):
                     configp["coordinates"]["elv"] = str(msg.altitude)
                     configp["coordinates"]["idsta"] = str(msg.ref_station_id)
                     editparam()
-                    print("------")
-                    print("ROVER: ",configp["coordinates"]["lat"],configp["coordinates"]["lon"],configp["coordinates"]["time"])
-                    print("------")
+                    logging.info("------")
+                    logging.info(
+                        "ROVER: (%s, %s) %s",
+                        str(configp["coordinates"]["lat"]),
+                        str(configp["coordinates"]["lon"]),
+                        str(configp["coordinates"]["time"])
+                    )
+                    logging.info("------")
                     ## 2-Get caster sourcetable
                     ntripbrowser()
                     ### Check if it is necessary to change the base
@@ -383,21 +397,24 @@ def loop_mp(stopEvent):
                             ##critique + Hysteresis(htrs)
                             crithtrs = int(configp["data"]["mp_km_crit"]) + int(configp["data"]["htrs"])
                             if Decimal(configp["data"]["dist_r2mp"]) < crithtrs:
-                                print("INFO: Hysteresis critique running: ",crithtrs,"km")
+                                logging.info("INFO: Hysteresis critique running: %skm", str(crithtrs))
                             else:
                                 ##middle mount point 2 mount point hysteresis
                                 r2mphtrs = mp_use1_km + int(configp["data"]["htrs"])
                                 if Decimal(configp["data"]["dist_r2mp"]) < r2mphtrs:
-                                    print("INFO: Hysteresis MP 2 MP running: ",r2mphtrs,"km")
+                                    logging.info("INFO: Hysteresis MP 2 MP running: %skm", str(r2mphtrs))
                                 else:
                                     movetobase()
                                     savelog()
                         else:
-                            print(
-                                "INFO:",mp_use1," nearby: ",Decimal(configp["data"]["dist_r2mp"]),
-                                " But critical distance not reached: ",configp["data"]["mp_km_crit"],"km")
+                            logging.info(
+                                "%s nearby (%s) but critical distance not reached: %skm",
+                                mp_use1,
+                                str(Decimal(configp["data"]["dist_r2mp"])),
+                                str(configp["data"]["mp_km_crit"])
+                            )
                     if configp["data"]["mp_use"] == mp_use1:
-                        print("INFO: Always connected to ",mp_use1)
+                        logging.info("INFO: Always connected to %s", mp_use1)
         except serial.SerialException as e:
             #print('Device error: {}'.format(e))
             continue
@@ -415,7 +432,7 @@ def stoptowrite():
     editparam()
     loop_str = multiprocessing.Process(name='loop',target=loop_mp)
     loop_str.deamon = True
-    print("Loop_str Starting:", multiprocessing.current_process().name)
+    logging.info("Loop_str Starting")
     loop_str.start()
 
 # Make it simple and just stop the app, count on docker to restart everything
@@ -425,10 +442,10 @@ def restartbasevar():
     global stopEvent
     ## KILL old str2str_in
     killstr()
-    print("Restart > Stop running")
+    logging.info("Restart > Stop running")
     running = False
     stopEvent.set()
-    print("Bot > Stop polling (from restartbasevar)")
+    logging.info("Bot > Stop polling (from restartbasevar)")
     bot.stop_polling()
 
 def killstr():
@@ -439,7 +456,7 @@ def killstr():
         pidkill = fields[0]
         # terminating process
         os.kill(int(pidkill), signal.SIGKILL)
-    print("KILLING all 'STR2STR -in ntrip' Successfully terminated")
+    logging.info("KILLING all 'STR2STR -in ntrip' Successfully terminated")
 
 def str2str_out():
     global str2str_out
@@ -456,14 +473,14 @@ def start_out_str2str():
     global out_str
     out_str = multiprocessing.Process(name='str_out',target=str2str_out)
     out_str.deamon = True
-    print("Out_str Started:", multiprocessing.current_process().name)
+    logging.info("Out_str Started")
     out_str.start()
 
 def start_in_str2str():
     global in_str
     in_str = multiprocessing.Process(name='str_in',target=str2str_in)
     in_str.deamon = True
-    print("In_str Started:", multiprocessing.current_process().name)
+    logging.info("In_str Started")
     in_str.start()
 
 def start_loop_basevar():
@@ -472,7 +489,7 @@ def start_loop_basevar():
 
     loop_str = multiprocessing.Process(name='loop',target=loop_mp,args=(stopEvent,))
     loop_str.deamon = True
-    print("Loop_str Starting:", multiprocessing.current_process().name)
+    logging.info("Loop_str Starting")
     loop_str.start()
 
 def main():
@@ -485,23 +502,23 @@ def main():
     start_in_str2str()
     start_loop_basevar()
 
-    print("Bot> Start polling")
+    logging.info("Bot> Start polling")
 
     while running:
-        print("Bot> polling (start)")
+        logging.info("Bot> polling (start)")
         bot.polling(long_polling_timeout=10)
-        print("Bot> polling (stop)")
+        logging.info("Bot> polling (stop)")
 
-    print("Joining out_str ...")
+    logging.info("Joining out_str ...")
     out_str.join()
 
-    print("Joining in_str ...")
+    logging.info("Joining in_str ...")
     in_str.join()
 
-    print("Joining loop_str ...")
+    logging.info("Joining loop_str ...")
     loop_str.join()
 
-    print("Exiting")
+    logging.info("Exiting")
 
 if __name__ == '__main__':
     main()
