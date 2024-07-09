@@ -234,8 +234,7 @@ def telegrambot():
 def telegrambot2():
     configp.read(paramname)
     #bot.send_message(configp["telegram"]["user_id"], "RtkBaseVar 0.2\nhttps://github.com/jancelin/RtkBaseVar/releases/tag/RtkBaseVar_0_2\n\n")
-    bot.send_message(configp["telegram"]["user_id"], configp["message"]["message2"]
-        +"\nYou are connected to "+configp["data"]["mp_use"])
+    bot.send_message(configp["telegram"]["user_id"], configp["message"]["message2"])
 
 ##Create user log file
 def createlog():
@@ -497,7 +496,6 @@ def main():
 
     createlog()
     telegrambot2()
-    telegramlocation()
     start_out_str2str()
     start_in_str2str()
     start_loop_basevar()
