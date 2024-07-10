@@ -295,10 +295,16 @@ def ntripbrowser():
     global mp_use1_km
     global mp_Carrier
     ## 2-Get caster sourcetable
-    browser = (NtripBrowser(configp["caster"]["adrs"], port=configp["caster"]["port"],
-    timeout=10,coordinates=(Decimal(configp["coordinates"]["lat"]),Decimal(configp["coordinates"]["lon"])),
-    maxdist=int(configp["data"]["maxdist"]) ))
-    getmp= browser.get_mountpoints()
+    browser = (
+        NtripBrowser(
+            host=configp["caster"]["adrs"],
+            port=configp["caster"]["port"],
+            timeout=10,
+            coordinates=(Decimal(configp["coordinates"]["lat"]),Decimal(configp["coordinates"]["lon"])),
+            maxdist=int(configp["data"]["maxdist"])
+        )
+    )
+    getmp = browser.get_mountpoints()
     flt = getmp['str']
     # Purge list
     flt1 = []
