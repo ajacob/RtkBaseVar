@@ -12,6 +12,7 @@ services:
       - ./RtkBaseVar/logs:/home/logs
       - ./RtkBaseVar/param:/home/param
     environment:
+      - TZ=Europe/Paris
       - APIKEY=
       - USERID=
     logging:

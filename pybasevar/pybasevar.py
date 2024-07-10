@@ -6,8 +6,6 @@ import os
 import signal
 import telegram
 import telebot
-from telebot import types
-import sys
 from decimal import *
 from ntripbrowser import NtripBrowser
 import multiprocessing
@@ -17,6 +15,7 @@ import configparser
 import shutil
 import os.path
 import logging
+import threading
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s %(message)s',
@@ -30,39 +29,81 @@ apiKey = os.environ["APIKEY"]
 userId = os.environ["USERID"]
 
 ##global variable loops
-loop_str = None
 mp_use1 = "CT"
 running = True
-stopEvent = multiprocessing.Event()
 
 ## activate .ini
 configp = configparser.ConfigParser()
-##Param.ini
+
+## Param.ini
 paramname = "param/param_" + userId + ".ini"
-##Create user param file
+
+## Create user param file
 if os.path.isfile(paramname):
     logging.info("%s already exist", paramname)
 else:
     shutil.copy('param.ini', paramname)
     logging.info("Creating %s", paramname)
+
 configp.read(paramname)
 
 def editparam():
     with open(paramname,'w') as configfile:
         configp.write(configfile)
 
+def local_time_to_tuple(local_time):
+    if not local_time:
+        return None
+
+    t = tuple(int(i) for i in local_time.split(':')[:])
+
+    if len(t) != 3:
+        raise Exception(local_time + " is not a valid local time!")
+
+    return t
+
 ##Telegram param
 configp["telegram"]["api_key"] = apiKey
 configp["telegram"]["user_id"] = userId
+
 editparam()
+
 configp.read(paramname)
+
+start_time_tuple = local_time_to_tuple(configp["global"]["start_time"])
+stop_time_tuple = local_time_to_tuple(configp["global"]["stop_time"])
+
+def is_working_hours():
+    global start_time_tuple
+    global stop_time_tuple
+
+    if start_time_tuple is None or stop_time_tuple is None:
+        return True
+
+    now = datetime.now()
+    current_local_time = (now.hour, now.minute, now.second)
+
+    return current_local_time > start_time_tuple and current_local_time < stop_time_tuple
+
+if start_time_tuple is not None and stop_time_tuple is not None:
+    logging.info("Ensure local time is between %s and %s", start_time_tuple, stop_time_tuple)
+
+    while True:
+        if is_working_hours():
+            logging.info("It's time! Ready to rock!")
+            break
+
+        time.sleep(1)
+
 bot = telebot.TeleBot(configp["telegram"]["api_key"])
 
 @bot.message_handler(commands=['restart'])
 def send_restart(message):
     configp.read(paramname)
     bot.reply_to(message, "Restarting ... (I'll be back in a few seconds!)")
-    restartbasevar()
+    # Make it simple and just stop the app, count on docker to restart everything
+    # This is better than trying to restart ourself as we may leak resources
+    stop_server()
 
 #base filter
 @bot.message_handler(commands=['excl'])
@@ -75,7 +116,7 @@ def processSetExclE(message):
     if answer.isupper():
         logging.info(answer)
         configp["data"]["exc_mp"] = answer
-        stoptowrite()
+        editparam()
         bot.reply_to(message,"NEW exclude Base(s): "+configp["data"]["exc_mp"])
     else:
         bot.reply_to(message, 'Oooops bad value!')
@@ -91,7 +132,7 @@ def processSetHtrsE(message):
     if answer.isdigit():
         logging.info(answer)
         configp["data"]["htrs"] = answer
-        stoptowrite()
+        editparam()
         bot.reply_to(message,"NEW Hysteresis: "+configp["data"]["htrs"]+"km")
     else:
         bot.reply_to(message, 'Oooops bad value!')
@@ -107,7 +148,7 @@ def processSetCritE(message):
     if answer.isdigit():
         logging.info(answer)
         configp["data"]["mp_km_crit"] = answer
-        stoptowrite()
+        editparam()
         bot.reply_to(message,"NEW Maximum distance before GNSS base change saved: "+configp["data"]["mp_km_crit"]+"km")
     else:
         bot.reply_to(message, 'Oooops bad value!')
@@ -123,7 +164,7 @@ def processSetDistE(message):
     if answer.isdigit():
         logging.info(answer)
         configp["data"]["maxdist"] = answer
-        stoptowrite()
+        editparam()
         bot.reply_to(message,"NEW Max search distance: "+configp["data"]["maxdist"]+"km")
     else:
         bot.reply_to(message, 'Oooops bad value!')
@@ -148,7 +189,7 @@ def processSetCasterPortE(message):
     if answer.isdigit():
         logging.info(answer)
         configp["caster"]["port"] = answer
-        stoptowrite()
+        editparam()
         bot.reply_to(message,"NEW caster adress + port: "+configp["caster"]["adrs"]+":"+configp["caster"]["port"])
     else:
         bot.reply_to(message, 'Oooops bad value!')
@@ -230,11 +271,6 @@ def telegrambot():
     configp.read(paramname)
     bot1 = telegram.Bot(token=configp["telegram"]["api_key"])
     bot1.send_message(configp["telegram"]["user_id"], configp["message"]["message"])
-
-def telegrambot2():
-    configp.read(paramname)
-    #bot.send_message(configp["telegram"]["user_id"], "RtkBaseVar 0.2\nhttps://github.com/jancelin/RtkBaseVar/releases/tag/RtkBaseVar_0_2\n\n")
-    bot.send_message(configp["telegram"]["user_id"], configp["message"]["message2"])
 
 ##Create user log file
 def createlog():
@@ -342,17 +378,18 @@ def ntripbrowser():
     #     print(mp,di,"km; Carrier:", car)
 
 ## 03-START loop to check base alive + rover position and nearest base
-def loop_mp(stopEvent):
+def loop_mp():
+    global running
     global mp_use1
     global mp_use1_km
     global msg
 
-    while True:
+    while running:
         try:
-            stopEvent.wait(0.1)
-
-            if stopEvent.is_set():
-                logging.info("loop_mp > Stop event received, exiting")
+            if not is_working_hours():
+                logging.info("loop_mp > Not in working hours anymore, exiting")
+                bot.send_message(configp["telegram"]["user_id"], configp["message"]["exit_non_working_hours"])
+                stop_server()
                 break
 
             ##get variables
@@ -420,37 +457,26 @@ def loop_mp(stopEvent):
                             )
                     if configp["data"]["mp_use"] == mp_use1:
                         logging.info("INFO: Always connected to %s", mp_use1)
-        except serial.SerialException as e:
-            #print('Device error: {}'.format(e))
+        except serial.SerialException:
+            logging.exception("Device error")
+            time.sleep(1)
             continue
-        except pynmea2.ParseError as e:
-            #print('Parse error: {}'.format(e))
+        except pynmea2.ParseError:
+            logging.exception("Parse error")
+            time.sleep(1)
             continue
         except Exception:
+            logging.exception("Exception")
+            time.sleep(1)
             continue
 
-## stop loop for change parameters (.ini)
-def stoptowrite():
-    global loop_str
-    loop_str.terminate()
-    time.sleep(2)
-    editparam()
-    loop_str = multiprocessing.Process(name='loop',target=loop_mp)
-    loop_str.deamon = True
-    logging.info("Loop_str Starting")
-    loop_str.start()
-
-# Make it simple and just stop the app, count on docker to restart everything
-# This is better than trying to restart ourself as we may leak resources
-def restartbasevar():
+def stop_server():
     global running
-    global stopEvent
     ## KILL old str2str_in
     killstr()
-    logging.info("Restart > Stop running")
+    logging.info("stop_server > Stop running")
     running = False
-    stopEvent.set()
-    logging.info("Bot > Stop polling (from restartbasevar)")
+    logging.info("Bot > Stop polling (from stop_server)")
     bot.stop_polling()
 
 def killstr():
@@ -488,39 +514,24 @@ def start_in_str2str():
     logging.info("In_str Started")
     in_str.start()
 
-def start_loop_basevar():
-    global loop_str
-    global stopEvent
-
-    loop_str = multiprocessing.Process(name='loop',target=loop_mp,args=(stopEvent,))
-    loop_str.deamon = True
-    logging.info("Loop_str Starting")
-    loop_str.start()
-
 def main():
-    global running
-
     createlog()
-    telegrambot2()
+
+    bot.send_message(configp["telegram"]["user_id"], configp["message"]["start1"])
+    bot.send_message(configp["telegram"]["user_id"], configp["message"]["start2"])
+
     start_out_str2str()
     start_in_str2str()
-    start_loop_basevar()
 
-    logging.info("Bot> Start polling")
+    threading.Thread(target=bot.infinity_polling, name='bot_infinity_polling', daemon=True).start()
 
-    while running:
-        logging.info("Bot> polling (start)")
-        bot.polling(long_polling_timeout=10)
-        logging.info("Bot> polling (stop)")
+    loop_mp()
 
     logging.info("Joining out_str ...")
     out_str.join()
 
     logging.info("Joining in_str ...")
     in_str.join()
-
-    logging.info("Joining loop_str ...")
-    loop_str.join()
 
     logging.info("Exiting")
 
