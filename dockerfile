@@ -15,7 +15,7 @@ RUN \
     && apt-get autoremove -y apt-utils build-essential git
 
 #install python package
-RUN pip install --upgrade pyserial pynmea2 ntripbrowser python-telegram-bot pyTelegramBotAPI configparser
+RUN pip install --upgrade pyserial pynmea2 ntripbrowser pyTelegramBotAPI configparser
 
 #copy pybasevar
 COPY pybasevar/* /home/

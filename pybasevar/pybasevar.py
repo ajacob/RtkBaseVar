@@ -4,7 +4,6 @@ import time
 import subprocess
 import os
 import signal
-import telegram
 import telebot
 from decimal import *
 from ntripbrowser import NtripBrowser
@@ -218,7 +217,7 @@ def processSetLogE(message):
 
 #show last coordinates / map
 @bot.message_handler(commands=['map'])
-def send_map(message):
+def send_map():
     configp.read(paramname)
     telegramposition()
     telegramlocation()
@@ -255,22 +254,12 @@ def telegramposition():
         "Connected to "+configp["data"]["mp_use"])
 
 def telegramlocation():
-    configp.read(paramname)
-    bot.send_location(configp["telegram"]["user_id"],
+    bot.send_location(
+        chat_id=configp["telegram"]["user_id"],
         longitude=configp["coordinates"]["lon"],
         latitude=configp["coordinates"]["lat"],
-        live_period=None, reply_to_message_id=None,
-        reply_markup=None, disable_notification=None,
-        timeout=None, horizontal_accuracy=configp["coordinates"]["hdop"],
-        heading=None,
-        proximity_alert_radius=None, allow_sending_without_reply=None,
-        protect_content=None)
-
-#Automatic message on base change with pytelegrambot (BUG ssl use python-telegram-bot not pyTelegramBotAPI )
-def telegrambot():
-    configp.read(paramname)
-    bot1 = telegram.Bot(token=configp["telegram"]["api_key"])
-    bot1.send_message(configp["telegram"]["user_id"], configp["message"]["message"])
+        horizontal_accuracy=configp["coordinates"]["hdop"],
+    )
 
 ##Create user log file
 def createlog():
@@ -282,10 +271,11 @@ def createlog():
         f.close
 
 ##Save LOG
-def savelog():
+def savelog(message):
     ##log in file
     file = open(logname, "a")
-    file.write(configp["message"]["message"] +'\n')
+    file.write(message)
+    file.write('\n')
     file.close
 
 #Delete logs
@@ -294,8 +284,6 @@ def clearlog():
     createlog()
 
 def movetobase():
-    ## Build new str2str_in command
-    bashstr = config.stream1 + mp_use1 + config.stream2
     ## LOG Move to base
     logging.info("------")
     logging.info("CASTER: Move to base %s!", mp_use1)
@@ -308,7 +296,7 @@ def movetobase():
     time.sleep(2)
     start_in_str2str()
     ##Metadata
-    configp["message"]["message"] = ("Move to base ," +
+    message = ("Move to base," +
     str(mp_use1) +","+
     str(round(mp_use1_km,2))+","+
     configp["coordinates"]["lat"]+","+
@@ -319,9 +307,10 @@ def movetobase():
     configp["coordinates"]["hdop"]+","+
     configp["coordinates"]["elv"]+","+
     configp["coordinates"]["idsta"])
-    editparam()
-    telegrambot()
-    # telegramlocation()
+    savelog(message)
+    bot.send_message(configp["telegram"]["user_id"], "📡 We are now connected to " + str(mp_use1))
+    telegramlocation()
+    telegramposition()
 
 def ntripbrowser():
     global browser
@@ -401,7 +390,6 @@ def loop_mp():
             if len(flt_basealive) == 0:
                 logging.info("INFO: Base %s is DEAD!", configp["data"]["mp_alive"])
                 movetobase()
-                savelog()
             else:
                 # print("INFO: Connected to ",configp["data"]["mp_use"],", Waiting for the rover's geographical coordinates......")
                 ## 1-Analyse nmea from gnss ntripclient for get lon lat
@@ -447,7 +435,6 @@ def loop_mp():
                                     logging.info("INFO: Hysteresis MP 2 MP running: %skm", str(r2mphtrs))
                                 else:
                                     movetobase()
-                                    savelog()
                         else:
                             logging.info(
                                 "%s nearby (%s) but critical distance not reached: %skm",
@@ -482,6 +469,7 @@ def stop_server():
 def killstr():
     # iterating through each instance of the process
     for line in os.popen("ps ax | grep 'str2str -in ntrip' | grep -v grep"):
+        logging.info("We need to kill '%s'", line)
         fields = line.split()
         # extracting Process ID from the output
         pidkill = fields[0]
@@ -514,7 +502,7 @@ def start_in_str2str():
     logging.info("In_str Started")
     in_str.start()
 
-def main():
+if __name__ == '__main__':
     createlog()
 
     bot.send_message(configp["telegram"]["user_id"], configp["message"]["start1"])
@@ -527,13 +515,4 @@ def main():
 
     loop_mp()
 
-    logging.info("Joining out_str ...")
-    out_str.join()
-
-    logging.info("Joining in_str ...")
-    in_str.join()
-
     logging.info("Exiting")
-
-if __name__ == '__main__':
-    main()
