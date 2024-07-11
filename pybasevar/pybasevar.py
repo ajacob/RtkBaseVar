@@ -406,12 +406,20 @@ def loop_mp():
 
             # print("INFO: Connected to ",configp["data"]["mp_use"],", Waiting for the rover's geographical coordinates......")
             ## 1-Analyse nmea from gnss ntripclient for get lon lat
-            ##TODO after x min reset parameters
             line = config.sio.readline()
+
+            if not line:
+                logging.info("Received empty line, skipping")
+                continue
+
+            logging.debug("Line received: %s", line.replace("\n", ""))
+
             msg = pynmea2.parse(line)
 
             ## Exclude bad longitude
+            ## This actually happens when client is not connected
             if msg.longitude == 0.0:
+                logging.debug("Bad longitude")
                 continue
 
             ## LOG coordinate from Rover
