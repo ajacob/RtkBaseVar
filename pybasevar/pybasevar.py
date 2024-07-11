@@ -402,60 +402,68 @@ def loop_mp():
             if len(flt_basealive) == 0:
                 logging.info("INFO: Base %s is DEAD!", configp["data"]["mp_alive"])
                 movetobase()
-            else:
-                # print("INFO: Connected to ",configp["data"]["mp_use"],", Waiting for the rover's geographical coordinates......")
-                ## 1-Analyse nmea from gnss ntripclient for get lon lat
-                ##TODO after x min reset parameters
-                line = config.sio.readline()
-                msg = pynmea2.parse(line)
-                ## Exclude bad longitude
-                if msg.longitude != 0.0:
-                    ## LOG coordinate from Rover
-                    presentday = datetime.now()
-                    configp["coordinates"]["lat"] = str(round(msg.latitude,7))
-                    configp["coordinates"]["lon"] = str(round(msg.longitude,7))
-                    configp["coordinates"]["date"] = str(presentday.strftime('%Y-%m-%d'))
-                    configp["coordinates"]["time"] = str(msg.timestamp)
-                    configp["coordinates"]["type"] = str(msg.gps_qual)
-                    configp["coordinates"]["hdop"] = str(msg.horizontal_dil)
-                    configp["coordinates"]["elv"] = str(msg.altitude)
-                    configp["coordinates"]["idsta"] = str(msg.ref_station_id)
-                    editparam()
-                    logging.info("------")
-                    logging.info(
-                        "ROVER: (%s, %s) %s",
-                        str(configp["coordinates"]["lat"]),
-                        str(configp["coordinates"]["lon"]),
-                        str(configp["coordinates"]["time"])
-                    )
-                    logging.info("------")
-                    ## 2-Get caster sourcetable
-                    ntripbrowser()
-                    ### Check if it is necessary to change the base
-                    ## nearest Base is different?
-                    if configp["data"]["mp_use"] != mp_use1:
-                        ## Check Critical distance before change ?
-                        if Decimal(configp["data"]["dist_r2mp"]) > int(configp["data"]["mp_km_crit"]):
-                            ##critique + Hysteresis(htrs)
-                            crithtrs = int(configp["data"]["mp_km_crit"]) + int(configp["data"]["htrs"])
-                            if Decimal(configp["data"]["dist_r2mp"]) < crithtrs:
-                                logging.info("INFO: Hysteresis critique running: %skm", str(crithtrs))
-                            else:
-                                ##middle mount point 2 mount point hysteresis
-                                r2mphtrs = mp_use1_km + int(configp["data"]["htrs"])
-                                if Decimal(configp["data"]["dist_r2mp"]) < r2mphtrs:
-                                    logging.info("INFO: Hysteresis MP 2 MP running: %skm", str(r2mphtrs))
-                                else:
-                                    movetobase()
+                continue
+
+            # print("INFO: Connected to ",configp["data"]["mp_use"],", Waiting for the rover's geographical coordinates......")
+            ## 1-Analyse nmea from gnss ntripclient for get lon lat
+            ##TODO after x min reset parameters
+            line = config.sio.readline()
+            msg = pynmea2.parse(line)
+
+            ## Exclude bad longitude
+            if msg.longitude == 0.0:
+                continue
+
+            ## LOG coordinate from Rover
+            presentday = datetime.now()
+            configp["coordinates"]["lat"] = str(round(msg.latitude,7))
+            configp["coordinates"]["lon"] = str(round(msg.longitude,7))
+            configp["coordinates"]["date"] = str(presentday.strftime('%Y-%m-%d'))
+            configp["coordinates"]["time"] = str(msg.timestamp)
+            configp["coordinates"]["type"] = str(msg.gps_qual)
+            configp["coordinates"]["hdop"] = str(msg.horizontal_dil)
+            configp["coordinates"]["elv"] = str(msg.altitude)
+            configp["coordinates"]["idsta"] = str(msg.ref_station_id)
+            editparam()
+
+            logging.info("------")
+            logging.info(
+                "ROVER: (%s, %s) %s",
+                str(configp["coordinates"]["lat"]),
+                str(configp["coordinates"]["lon"]),
+                str(configp["coordinates"]["time"])
+            )
+            logging.info("------")
+
+            ## 2-Get caster sourcetable
+            ntripbrowser()
+
+            ### Check if it is necessary to change the base
+            ## nearest Base is different?
+            if configp["data"]["mp_use"] != mp_use1:
+                ## Check Critical distance before change ?
+                if Decimal(configp["data"]["dist_r2mp"]) > int(configp["data"]["mp_km_crit"]):
+                    ##critique + Hysteresis(htrs)
+                    crithtrs = int(configp["data"]["mp_km_crit"]) + int(configp["data"]["htrs"])
+                    if Decimal(configp["data"]["dist_r2mp"]) < crithtrs:
+                        logging.info("INFO: Hysteresis critique running: %skm", str(crithtrs))
+                    else:
+                        ##middle mount point 2 mount point hysteresis
+                        r2mphtrs = mp_use1_km + int(configp["data"]["htrs"])
+                        if Decimal(configp["data"]["dist_r2mp"]) < r2mphtrs:
+                            logging.info("INFO: Hysteresis MP 2 MP running: %skm", str(r2mphtrs))
                         else:
-                            logging.info(
-                                "%s nearby (%s) but critical distance not reached: %skm",
-                                mp_use1,
-                                str(Decimal(configp["data"]["dist_r2mp"])),
-                                str(configp["data"]["mp_km_crit"])
-                            )
-                    if configp["data"]["mp_use"] == mp_use1:
-                        logging.info("INFO: Always connected to %s", mp_use1)
+                            movetobase()
+                else:
+                    logging.info(
+                        "%s nearby (%s) but critical distance not reached: %skm",
+                        mp_use1,
+                        str(Decimal(configp["data"]["dist_r2mp"])),
+                        str(configp["data"]["mp_km_crit"])
+                    )
+
+            if configp["data"]["mp_use"] == mp_use1:
+                logging.info("INFO: Always connected to %s", mp_use1)
         except serial.SerialException:
             logging.exception("Device error")
             time.sleep(1)
