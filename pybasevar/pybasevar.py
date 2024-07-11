@@ -8,7 +8,7 @@ import telebot
 from decimal import *
 from ntripbrowser import NtripBrowser
 import multiprocessing
-from datetime import datetime
+from datetime import datetime, timedelta
 import config
 import configparser
 import shutil
@@ -29,6 +29,7 @@ userId = os.environ["USERID"]
 
 ##global variable loops
 mp_use1 = "CT"
+mount_points_last_updated = None
 running = True
 
 ## activate .ini
@@ -319,6 +320,17 @@ def ntripbrowser():
     global mp_use1
     global mp_use1_km
     global mp_Carrier
+    global mount_points_last_updated
+
+    now = datetime.now()
+
+    if mount_points_last_updated is not None and (now - mount_points_last_updated).seconds < 60:
+        return
+
+    mount_points_last_updated = now
+
+    logging.info("ntripbrowser > Looking up mount points")
+
     ## 2-Get caster sourcetable
     browser = (
         NtripBrowser(
@@ -329,8 +341,9 @@ def ntripbrowser():
             maxdist=int(configp["data"]["maxdist"])
         )
     )
-    getmp = browser.get_mountpoints()
-    flt = getmp['str']
+
+    flt = browser.get_mountpoints()['str']
+
     # Purge list
     flt1 = []
     ## Param base filter
@@ -381,10 +394,9 @@ def loop_mp():
                 stop_server()
                 break
 
-            ##get variables
-            configp.read(paramname)
-            ##Get data from Caster
+            ## Get data from Caster
             ntripbrowser()
+
             ##My base is Alive?
             flt_basealive = [m for m in flt1 if m['Mountpoint']==configp["data"]["mp_alive"]]
             if len(flt_basealive) == 0:
