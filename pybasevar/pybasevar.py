@@ -86,7 +86,7 @@ def is_working_hours():
     return current_local_time > start_time_tuple and current_local_time < stop_time_tuple
 
 if start_time_tuple is not None and stop_time_tuple is not None:
-    logging.info("Ensure local time is between %s and %s", start_time_tuple, stop_time_tuple)
+    logging.info("Ensure local time is between %s and %s", configp["global"]["start_time"], configp["global"]["stop_time"])
 
     while True:
         if is_working_hours():
@@ -99,6 +99,7 @@ bot = telebot.TeleBot(configp["telegram"]["api_key"])
 
 @bot.message_handler(commands=['restart'])
 def send_restart(message):
+    logging.info("Received command /restart")
     configp.read(paramname)
     bot.reply_to(message, "Restarting ... (I'll be back in a few seconds!)")
     # Make it simple and just stop the app, count on docker to restart everything
@@ -108,6 +109,7 @@ def send_restart(message):
 #base filter
 @bot.message_handler(commands=['excl'])
 def send_exclE(message):
+    logging.info("Received command /excl")
     configp.read(paramname)
     msg = bot.reply_to(message,"Edit exclude Base(s):\n old value:"+configp["data"]["exc_mp"]+",\n Enter the new value ! ")
     bot.register_next_step_handler(msg, processSetExclE)
@@ -124,6 +126,7 @@ def processSetExclE(message):
 #hysteresis
 @bot.message_handler(commands=['htrs'])
 def send_htrsE(message):
+    logging.info("Received command /htrs")
     configp.read(paramname)
     msg = bot.reply_to(message,"Edit Hysteresis:\n old value:"+configp["data"]["htrs"]+"km,\n Enter the new value ! ")
     bot.register_next_step_handler(msg, processSetHtrsE)
@@ -140,6 +143,7 @@ def processSetHtrsE(message):
 #Critical distance
 @bot.message_handler(commands=['crit'])
 def send_critE(message):
+    logging.info("Received command /crit")
     configp.read(paramname)
     msg = bot.reply_to(message,"Edit Maximum distance before GNSS base change:\n Old value:"+configp["data"]["mp_km_crit"]+"km,\n Enter the new value ! ")
     bot.register_next_step_handler(msg, processSetCritE)
@@ -156,6 +160,7 @@ def processSetCritE(message):
 #search distance
 @bot.message_handler(commands=['dist'])
 def send_distE(message):
+    logging.info("Received command /dist")
     configp.read(paramname)
     msg = bot.reply_to(message,"Edit Max search distance of GNSS bases saved:\n old value:"+configp["data"]["maxdist"]+"km")
     bot.register_next_step_handler(msg, processSetDistE)
@@ -172,6 +177,7 @@ def processSetDistE(message):
 #caster
 @bot.message_handler(commands=['caster'])
 def send_casterE(message):
+    logging.info("Received command /caster")
     configp.read(paramname)
     msg = bot.reply_to(message,"Edit caster adress and port:\n old value:\n"+configp["caster"]["adrs"]+":"+configp["caster"]["port"]+"\n Enter caster adress: ")
     bot.register_next_step_handler(msg, processSetCasterE)
@@ -197,6 +203,7 @@ def processSetCasterPortE(message):
 #dowload logs
 @bot.message_handler(commands=['log'])
 def notas(mensagem):
+    logging.info("Received command /log")
     mensagemID = mensagem.chat.id
     doc = open(logname, 'rb')
     bot.send_document(mensagemID, doc)
@@ -204,6 +211,7 @@ def notas(mensagem):
 #clear log
 @bot.message_handler(commands=['clear'])
 def send_logE(message):
+    logging.info("Received command /clear")
     configp.read(paramname)
     msg = bot.reply_to(message,"Do you really want to delete the logs? (Yes/No)")
     bot.register_next_step_handler(msg, processSetLogE)
@@ -219,6 +227,7 @@ def processSetLogE(message):
 #show last coordinates / map
 @bot.message_handler(commands=['map'])
 def send_map(message):
+    logging.info("Received command /map")
     configp.read(paramname)
     telegramposition()
     telegramlocation()
