@@ -218,7 +218,7 @@ def processSetLogE(message):
 
 #show last coordinates / map
 @bot.message_handler(commands=['map'])
-def send_map():
+def send_map(message):
     configp.read(paramname)
     telegramposition()
     telegramlocation()
